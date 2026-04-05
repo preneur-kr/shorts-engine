@@ -28,17 +28,6 @@ jobs:
       - name: Install NPM Dependencies
         run: npm ci
 
-      - name: Compile TypeScript Workers
-        run: |
-          npx tsc src/worker/video-processor.ts src/worker/ai-analyzer.ts \
-            --outDir dist/worker \
-            --esModuleInterop \
-            --resolveJsonModule \
-            --module commonjs \
-            --moduleResolution node \
-            --noEmit false \
-            --skipLibCheck true
-
       - name: Run Video Processor
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -47,7 +36,7 @@ jobs:
           PROJECT_ID="${{ github.event.client_payload.project_id }}"
           VIDEO_URL="${{ github.event.client_payload.video_url }}"
           TRACE_ID="${{ github.event.client_payload.trace_id }}"
-          node dist/worker/video-processor.js "$PROJECT_ID" "$VIDEO_URL" "$TRACE_ID"
+          npx tsx src/worker/video-processor.ts "$PROJECT_ID" "$VIDEO_URL" "$TRACE_ID"
 
       - name: Run Gemini AI Analyzer
         env:
@@ -56,4 +45,4 @@ jobs:
           GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
         run: |
           PROJECT_ID="${{ github.event.client_payload.project_id }}"
-          node dist/worker/ai-analyzer.js "$PROJECT_ID"
+          npx tsx src/worker/ai-analyzer.ts "$PROJECT_ID"
