@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shortform Engine UI</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; padding: 20px; background-color: #f5f5f5; margin: 0; }
+        h2 { font-size: 16px; margin-bottom: 16px; }
+        .project-card {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .status { font-size: 12px; font-weight: bold; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+        .status.completed { background: #E8F5E9; color: #2E7D32; }
+        .status.pending { background: #FFF3E0; color: #EF6C00; }
+        button {
+            background: #0d99ff; color: white; border: none; padding: 8px 16px; border-radius: 6px;
+            cursor: pointer; font-weight: 500; width: 100%; margin-top: 8px;
+        }
+        button:hover { background: #0b80d6; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h2>🚀 Ready to Inject</h2>
+    <div id="project-list">Loading...</div>
+
+    <script>
+        // API Base URL (Change to Vercel production URL later)
+        const API_BASE = 'http://localhost:3000';
+
+        async function fetchProjects() {
+            try {
+                // Fetch from Next.js API
+                const res = await fetch(`${API_BASE}/api/projects`);
+                const data = await res.json();
+                renderProjects(data.projects);
+            } catch (err) {
+                document.getElementById('project-list').innerText = 'Failed to load projects. Is the local server running?';
+            }
+        }
+
+        function renderProjects(projects) {
+            const container = document.getElementById('project-list');
+            container.innerHTML = '';
+
+            projects.forEach(p => {
+                const isCompleted = p.status === 'COMPLETED';
+                const card = document.createElement('div');
+                card.className = 'project-card';
+                card.innerHTML = `
+                    <div class="status ${isCompleted ? 'completed' : 'pending'}">${p.status}</div>
+                    <div style="font-size: 14px; margin-bottom: 8px; word-break: break-all;">${p.source_url.substring(0, 40)}...</div>
+                    <button ${!isCompleted ? 'disabled' : ''} onclick="injectStoryboard('${p.id}')">
+                        ${isCompleted ? 'Inject Storyboard' : 'Processing...'}
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function injectStoryboard(projectId) {
+            try {
+                // Fetch detailed analysis & frames
+                const res = await fetch(`${API_BASE}/api/projects/${projectId}/analysis`);
+                const payload = await res.json();
+                
+                // Send data to Figma Canvas logic
+                parent.postMessage({ pluginMessage: { type: 'inject-storyboard', payload } }, '*');
+            } catch (err) {
+                alert('Failed to fetch analysis data.');
+            }
+        }
+
+        // Listen for image fetch requests from code.ts
+        window.onmessage = async (event) => {
+            const msg = event.data.pluginMessage;
+            if (msg && msg.type === 'fetch-image') {
+                try {
+                    const res = await fetch(msg.url);
+                    const buffer = await res.arrayBuffer();
+                    parent.postMessage({ pluginMessage: { type: 'image-fetched', frameId: msg.frameId, bytes: Array.from(new Uint8Array(buffer)) } }, '*');
+                } catch (e) {
+                    console.error("Image fetch failed", e);
+                }
+            }
+        };
+
+        fetchProjects();
+    </script>
+</body>
+</html>
