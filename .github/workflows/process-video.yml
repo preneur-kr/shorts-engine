@@ -30,7 +30,14 @@ jobs:
 
       - name: Compile TypeScript Workers
         run: |
-          npx tsc src/worker/video-processor.ts src/worker/ai-analyzer.ts --outDir dist/worker --esModuleInterop --resolveJsonModule
+          npx tsc src/worker/video-processor.ts src/worker/ai-analyzer.ts \
+            --outDir dist/worker \
+            --esModuleInterop \
+            --resolveJsonModule \
+            --module commonjs \
+            --moduleResolution node \
+            --noEmit false \
+            --skipLibCheck true
 
       - name: Run Video Processor
         env:
