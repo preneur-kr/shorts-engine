@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): ArrayBuffer {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
-  return bytes;
+  return bytes.buffer as ArrayBuffer;
 }
 
 async function verifySignature(body: string, signature: string, timestamp: string, publicKey: string): Promise<boolean> {
