@@ -56,9 +56,9 @@ async function runAIAnalyzer() {
     );
 
     // 3. Request Gemini Analysis
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    
-    console.log("Requesting Gemini 1.5 Pro analysis...");
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    console.log("Requesting Gemini 2.0 Flash analysis...");
     const result = await model.generateContent([
       SHORTFORM_ANALYSIS_PROMPT,
       ...imageParts
