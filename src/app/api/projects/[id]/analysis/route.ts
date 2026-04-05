@@ -7,9 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const projectId = params.id;
+  const { id: projectId } = await params;
   const traceId = crypto.randomUUID();
 
   try {
