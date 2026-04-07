@@ -31,7 +31,7 @@
 
     <script>
         // API Base URL (Change to Vercel production URL later)
-        const API_BASE = 'http://localhost:3000';
+        const API_BASE = 'https://shortform-reverse-engine.vercel.app';
 
         async function fetchProjects() {
             try {
@@ -76,16 +76,30 @@
             }
         }
 
-        // Listen for image fetch requests from code.ts
+        // Listen for messages from code.ts
         window.onmessage = async (event) => {
             const msg = event.data.pluginMessage;
-            if (msg && msg.type === 'fetch-image') {
+            if (!msg) return;
+
+            if (msg.type === 'fetch-image') {
                 try {
                     const res = await fetch(msg.url);
                     const buffer = await res.arrayBuffer();
                     parent.postMessage({ pluginMessage: { type: 'image-fetched', frameId: msg.frameId, bytes: Array.from(new Uint8Array(buffer)) } }, '*');
                 } catch (e) {
                     console.error("Image fetch failed", e);
+                }
+            }
+
+            if (msg.type === 'storyboard-injected') {
+                try {
+                    await fetch(`${API_BASE}/api/projects/${msg.projectId}/notify`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ figmaUrl: msg.figmaUrl }),
+                    });
+                } catch (e) {
+                    console.error("Discord notify failed", e);
                 }
             }
         };
