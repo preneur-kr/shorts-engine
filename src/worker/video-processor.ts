@@ -78,38 +78,31 @@ async function runVideoProcessor() {
     const files = fs.readdirSync(framesDir).filter(file => file.endsWith('.jpg')).sort();
     console.log(`Uploading ${files.length} frames to Supabase Storage...`);
     
-    const uploadedFrameRecords = [];
     const storagePathBase = `projects/${projectId}/frames`;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const filePath = path.join(framesDir, file);
-      const fileBuffer = fs.readFileSync(filePath);
-      
-      const storagePath = `${storagePathBase}/${file}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('shortform-assets')
-        .upload(storagePath, fileBuffer, {
-          contentType: 'image/jpeg',
-          upsert: true
-        });
+    const uploadedFrameRecords = await Promise.all(
+      files.map(async (file, i) => {
+        const filePath = path.join(framesDir, file);
+        const fileBuffer = fs.readFileSync(filePath);
+        const storagePath = `${storagePathBase}/${file}`;
 
-      if (uploadError) throw new Error(`Upload failed for ${file}: ${uploadError.message}`);
+        const { error: uploadError } = await supabase.storage
+          .from('shortform-assets')
+          .upload(storagePath, fileBuffer, { contentType: 'image/jpeg', upsert: true });
 
-      // Calculate timestamp based on fps=2 (0.5s per frame)
-      const timestamp = i * 1.0;
-      
-      const { data: publicUrlData } = supabase.storage
-        .from('shortform-assets')
-        .getPublicUrl(storagePath);
+        if (uploadError) throw new Error(`Upload failed for ${file}: ${uploadError.message}`);
 
-      uploadedFrameRecords.push({
-        project_id: projectId,
-        timestamp_seconds: timestamp,
-        storage_url: publicUrlData.publicUrl
-      });
-    }
+        const { data: publicUrlData } = supabase.storage
+          .from('shortform-assets')
+          .getPublicUrl(storagePath);
+
+        return {
+          project_id: projectId,
+          timestamp_seconds: i * 1.0,
+          storage_url: publicUrlData.publicUrl,
+        };
+      })
+    );
 
     // 5. Save frame metadata to DB (delete existing frames first to prevent duplicates)
     await supabase.from('frames').delete().eq('project_id', projectId);

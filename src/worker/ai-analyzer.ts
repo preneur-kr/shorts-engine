@@ -47,8 +47,8 @@ async function runAIAnalyzer() {
     console.log(`Fetched ${frames.length} frames. Preparing multi-modal input...`);
 
     // 2. Sample frames to stay within token limits (e.g., every 4th frame if too many)
-    const sampledFrames = frames.length > 30 
-      ? frames.filter((_, i) => i % Math.ceil(frames.length / 30) === 0)
+    const sampledFrames = frames.length > 15
+      ? frames.filter((_, i) => i % Math.ceil(frames.length / 15) === 0)
       : frames;
 
     const imageParts = await Promise.all(

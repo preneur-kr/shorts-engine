@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const APIFY_BASE = "https://api.apify.com/v2";
-const WAIT_SECS = 120;
+const WAIT_SECS = 30;
 
 export interface ApifyRunResult {
   item: Record<string, unknown> | undefined;

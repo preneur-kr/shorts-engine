@@ -18,14 +18,22 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Cache yt-dlp binary
+      - name: Cache FFmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: /usr/bin/ffmpeg
+          key: ffmpeg-ubuntu-latest
+
+      - name: Cache yt-dlp
         id: cache-ytdlp
         uses: actions/cache@v4
         with:
           path: /usr/local/bin/yt-dlp
-          key: yt-dlp-latest-v1
+          key: yt-dlp-latest
 
       - name: Install System Dependencies (FFmpeg & yt-dlp)
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true' || steps.cache-ytdlp.outputs.cache-hit != 'true'
         run: |
           if ! command -v ffmpeg &> /dev/null; then
             sudo apt-get update -qq
