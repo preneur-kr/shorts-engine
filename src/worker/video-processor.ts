@@ -3,6 +3,7 @@ import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
+import { runApifyScraper, extractVideoUrl } from '../services/apify';
 
 const execAsync = util.promisify(exec);
 
@@ -10,13 +11,14 @@ const execAsync = util.promisify(exec);
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const apifyToken = process.env.APIFY_API_TOKEN || '';
 
 // Inputs passed as arguments by GitHub Actions
 const projectId = process.argv[2];
-const videoUrl = process.argv[3];
+const inputVideoUrl = process.argv[3];
 const traceId = process.argv[4];
 
-if (!projectId || !videoUrl) {
+if (!projectId || !inputVideoUrl) {
   console.error("Missing required arguments: projectId and videoUrl");
   process.exit(1);
 }
@@ -40,19 +42,36 @@ async function runVideoProcessor() {
     if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
     const videoPath = path.join(TEMP_DIR, 'video.mp4');
     
-    // 2. Download using yt-dlp
-    console.log(`Downloading video from ${videoUrl}...`);
-    // Using best quality mp4, max resolution 720p to save time/space
-    await execAsync(`yt-dlp -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" -o "${videoPath}" "${videoUrl}"`);
+    // 2. Scrape direct video URL using Apify
+    console.log(`Scraping direct video URL from ${inputVideoUrl} using Apify...`);
+    if (!apifyToken) {
+      throw new Error("Missing APIFY_API_TOKEN environment variable.");
+    }
+
+    const { item } = await runApifyScraper(inputVideoUrl, apifyToken);
+    const directVideoUrl = extractVideoUrl(item);
+    
+    if (!directVideoUrl) {
+      throw new Error("Could not extract direct video URL from Apify response.");
+    }
+    
+    console.log(`Direct video URL found: ${directVideoUrl}`);
+
+    // 3. Download using yt-dlp or curl (using direct URL often works without cookies)
+    console.log("Downloading video...");
+    // Using yt-dlp on the direct URL to handle potential format issues, or just curl
+    // But yt-dlp is good for ensuring the best compatible format if needed.
+    // Given the user wants to avoid yt-dlp session issues, using directUrl with curl is safer.
+    await execAsync(`curl -L -o "${videoPath}" "${directVideoUrl}"`);
     console.log("Download complete.");
 
-    // 3. Extract frames using FFmpeg (fps=2 -> 0.5s intervals)
+    // 4. Extract frames using FFmpeg (fps=2 -> 0.5s intervals)
     await updateStatus('EXTRACTING_FRAMES');
     const framesDir = path.join(TEMP_DIR, 'frames');
     if (!fs.existsSync(framesDir)) fs.mkdirSync(framesDir, { recursive: true });
     
     console.log("Extracting frames...");
-    await execAsync(`ffmpeg -i "${videoPath}" -vf "fps=2" "${framesDir}/frame_%04d.jpg"`);
+    await execAsync(`ffmpeg -i "${videoPath}" -vf "fps=1" "${framesDir}/frame_%04d.jpg"`);
     console.log("Extraction complete.");
 
     // 4. Upload frames to Supabase Storage
@@ -79,7 +98,7 @@ async function runVideoProcessor() {
       if (uploadError) throw new Error(`Upload failed for ${file}: ${uploadError.message}`);
 
       // Calculate timestamp based on fps=2 (0.5s per frame)
-      const timestamp = i * 0.5; 
+      const timestamp = i * 1.0;
       
       const { data: publicUrlData } = supabase.storage
         .from('shortform-assets')
@@ -92,7 +111,9 @@ async function runVideoProcessor() {
       });
     }
 
-    // 5. Save frame metadata to DB
+    // 5. Save frame metadata to DB (delete existing frames first to prevent duplicates)
+    await supabase.from('frames').delete().eq('project_id', projectId);
+
     const { error: dbError } = await supabase
       .from('frames')
       .insert(uploadedFrameRecords);
