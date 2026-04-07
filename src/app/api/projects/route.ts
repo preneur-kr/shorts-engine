@@ -20,9 +20,22 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch projects', traceId }, { status: 500 });
     }
 
-    return NextResponse.json({ projects, traceId });
+    return NextResponse.json({ projects, traceId }, {
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    });
   } catch (error) {
     console.error(`[Unhandled API Error] Trace: ${traceId}`, error);
     return NextResponse.json({ error: 'Internal Server Error', traceId }, { status: 500 });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }

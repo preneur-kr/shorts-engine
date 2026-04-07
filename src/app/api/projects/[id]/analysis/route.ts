@@ -40,10 +40,23 @@ export async function GET(
       analysis: project.analysis_insights?.[0] || null,
       frames,
       traceId
+    }, {
+      headers: { 'Access-Control-Allow-Origin': '*' },
     });
 
   } catch (error) {
     console.error(`[Unhandled API Error] Trace: ${traceId}`, error);
     return NextResponse.json({ error: 'Internal Server Error', traceId }, { status: 500 });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }
