@@ -45,6 +45,7 @@ async function runAIAnalyzer() {
     await updateStatus(supabase, projectId, 'COMPLETED');
 
     console.log(`[AI Worker Completed] Project ${projectId} is now COMPLETED.`);
+    process.exit(0);
 
   } catch (error: any) {
     console.error(`[AI Worker Failed] ${error.message}`);

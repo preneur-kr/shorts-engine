@@ -65,6 +65,7 @@ async function runVideoProcessor() {
 
     await updateStatus(supabase, projectId, 'ANALYZING');
     console.log('[Worker Completed] Ready for AI Analysis.');
+    process.exit(0);
 
   } catch (error: any) {
     console.error(`[Worker Failed] ${error.message}`);
