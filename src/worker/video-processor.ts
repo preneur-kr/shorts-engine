@@ -46,14 +46,18 @@ async function runVideoProcessor() {
     // 2. 영상 다운로드
     await downloadVideo(directVideoUrl, videoPath);
 
-    // 3. 프레임 추출 (Figma 플러그인 캐러셀용)
+    // 3. 프레임 추출
     await updateStatus(supabase, projectId, 'EXTRACTING_FRAMES');
     await extractFrames(videoPath, framesDir);
-    const records = await uploadFrames(supabase, framesDir, projectId);
-    await saveFrameRecords(supabase, projectId, records);
 
-    // 4. Gemini File API에 영상 업로드 → URI 저장
-    const geminiFileUri = await uploadVideoToGemini(geminiApiKey, videoPath);
+    // 4. Supabase 프레임 업로드 & Gemini 영상 업로드 병렬 실행
+    const [records, geminiFileUri] = await Promise.all([
+      uploadFrames(supabase, framesDir, projectId).then(async (r) => {
+        await saveFrameRecords(supabase, projectId, r);
+        return r;
+      }),
+      uploadVideoToGemini(geminiApiKey, videoPath),
+    ]);
     await supabase
       .from('projects')
       .update({ gemini_file_uri: geminiFileUri, updated_at: new Date().toISOString() })
