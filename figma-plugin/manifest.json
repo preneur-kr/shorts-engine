@@ -6,6 +6,7 @@
   "ui": "dist/ui.html",
   "editorType": ["figma"],
   "networkAccess": {
-    "allowedDomains": ["*"]
+    "allowedDomains": ["*"],
+    "reasoning": "Fetches video frame images from Supabase Storage and calls the Shortform Engine API to retrieve analysis results and send Discord notifications."
   }
 }
