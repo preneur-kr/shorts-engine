@@ -15,6 +15,13 @@ if (!projectId) {
   process.exit(1);
 }
 
+// 프로세스 하드킬: SDK 내부 HTTP 연결이 event loop을 막아도 강제 종료
+const hardKillTimer = setTimeout(() => {
+  console.error('[AI Worker] Hard kill: process exceeded 6 minute limit');
+  process.exit(1);
+}, 6 * 60 * 1000);
+hardKillTimer.unref(); // 정상 완료 시 프로세스 자연 종료 허용
+
 async function runAIAnalyzer() {
   console.log(`[AI Worker Started] Analyzing Project: ${projectId}`);
 
