@@ -1,164 +1,190 @@
-figma.showUI(__html__, { width: 400, height: 600 });
+figma.showUI(__html__, { width: 360, height: 560 });
+
+const GRID_COLS = 8;
+const IMG_W = 720;
+const IMG_H = 1280;
+const IMG_GAP = 24;
+const PAD = 36;
+const SECTION_W = 6000;
+const SCRIPT_COL_W = (SECTION_W - PAD * 2 - 24) / 2; // 2952
+
+let sectionCount = 0;
+let koreanFont: FontName = { family: 'Inter', style: 'Regular' };
+let fontsLoaded = false;
+
+async function loadFonts() {
+  if (fontsLoaded) return;
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+  await figma.loadFontAsync({ family: 'Inter', style: 'Bold' });
+  for (const font of [
+    { family: 'Noto Sans KR', style: 'Regular' },
+    { family: 'Apple SD Gothic Neo', style: 'Regular' },
+  ]) {
+    try {
+      await figma.loadFontAsync(font);
+      koreanFont = font;
+      break;
+    } catch { /* fallback to Inter */ }
+  }
+  fontsLoaded = true;
+}
+
+async function getProcessed(): Promise<string[]> {
+  return (await figma.clientStorage.getAsync('processedProjects')) || [];
+}
+
+async function saveProcessed(projectId: string) {
+  const stored = await getProcessed();
+  if (!stored.includes(projectId)) {
+    await figma.clientStorage.setAsync('processedProjects', [...stored, projectId]);
+  }
+}
 
 figma.ui.onmessage = async (msg) => {
-  if (msg.type === 'inject-storyboard') {
-    const { project, frames, analysis } = msg.payload;
 
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+  // UI asks: which of these project IDs haven't been rendered yet?
+  if (msg.type === 'get-unprocessed') {
+    const stored = await getProcessed();
+    const unprocessedIds = (msg.projectIds as string[]).filter(id => !stored.includes(id));
+    figma.ui.postMessage({ type: 'unprocessed-result', unprocessedIds });
+  }
 
-    // 1. Main storyboard frame
-    const storyboardFrame = figma.createFrame();
-    storyboardFrame.name = `Storyboard: ${project.source_url}`;
-    storyboardFrame.layoutMode = "VERTICAL";
-    storyboardFrame.itemSpacing = 32;
-    storyboardFrame.paddingTop = 40;
-    storyboardFrame.paddingBottom = 40;
-    storyboardFrame.paddingLeft = 40;
-    storyboardFrame.paddingRight = 40;
-    storyboardFrame.fills = [{ type: 'SOLID', color: { r: 0.97, g: 0.97, b: 0.97 } }];
-    storyboardFrame.cornerRadius = 16;
-    storyboardFrame.primaryAxisSizingMode = "AUTO";
-    storyboardFrame.counterAxisSizingMode = "FIXED";
-    storyboardFrame.resize(1200, 100);
+  else if (msg.type === 'create-project-section') {
+    const { projectId, sourceUrl, originalScript, translatedScript } = msg;
+    await loadFonts();
 
-    // 2. Hook Analysis
-    const hookNode = figma.createText();
-    hookNode.characters = `💡 Hook Analysis\n${analysis?.hook_analysis || 'No analysis'}`;
-    hookNode.fontName = { family: "Inter", style: "Bold" };
-    hookNode.fontSize = 18;
-    hookNode.layoutAlign = "STRETCH";
-    storyboardFrame.appendChild(hookNode);
+    const section = figma.createFrame();
+    section.name = sourceUrl.replace(/https?:\/\/(www\.)?/, '').slice(0, 60);
+    section.fills = [{ type: 'SOLID', color: { r: 0.102, g: 0.102, b: 0.102 } }];
+    section.cornerRadius = 16;
+    section.resize(SECTION_W, 200);
 
-    // 3. Frames (all frames)
-    const framesContainer = figma.createFrame();
-    framesContainer.name = "Frames";
-    framesContainer.layoutMode = "HORIZONTAL";
-    framesContainer.itemSpacing = 12;
-    framesContainer.fills = [];
-    framesContainer.primaryAxisSizingMode = "AUTO";
-    framesContainer.counterAxisSizingMode = "AUTO";
-    storyboardFrame.appendChild(framesContainer);
+    // ORIGINAL label
+    const origLabel = figma.createText();
+    origLabel.fontName = { family: 'Inter', style: 'Bold' };
+    origLabel.fontSize = 14;
+    origLabel.characters = 'ORIGINAL';
+    origLabel.fills = [{ type: 'SOLID', color: { r: 0.53, g: 0.53, b: 0.53 } }];
+    origLabel.x = PAD;
+    origLabel.y = PAD;
+    section.appendChild(origLabel);
 
-    for (const frame of frames) {
-      const imgFrame = figma.createFrame();
-      imgFrame.resize(160, 284);
-      imgFrame.cornerRadius = 8;
-      figma.ui.postMessage({ type: 'fetch-image', url: frame.storage_url, frameId: imgFrame.id });
-      framesContainer.appendChild(imgFrame);
+    const origText = figma.createText();
+    origText.fontName = { family: 'Inter', style: 'Regular' };
+    origText.fontSize = 16;
+    origText.textAutoResize = 'HEIGHT';
+    origText.resize(SCRIPT_COL_W, 100);
+    origText.characters = originalScript || 'N/A';
+    origText.fills = [{ type: 'SOLID', color: { r: 0.867, g: 0.867, b: 0.867 } }];
+    origText.x = PAD;
+    origText.y = PAD + origLabel.height + 8;
+    section.appendChild(origText);
 
-      // Timestamp label
-      const label = figma.createText();
-      label.characters = `${frame.timestamp_seconds}s`;
-      label.fontSize = 11;
-      label.fontName = { family: "Inter", style: "Regular" };
-      label.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
-      framesContainer.appendChild(label);
-    }
+    // 한국어 label
+    const koLabel = figma.createText();
+    koLabel.fontName = { family: 'Inter', style: 'Bold' };
+    koLabel.fontSize = 14;
+    koLabel.characters = '한국어';
+    koLabel.fills = [{ type: 'SOLID', color: { r: 0.53, g: 0.53, b: 0.53 } }];
+    koLabel.x = PAD * 2 + SCRIPT_COL_W;
+    koLabel.y = PAD;
+    section.appendChild(koLabel);
 
-    // 4. Scripts section
-    const scriptsFrame = figma.createFrame();
-    scriptsFrame.name = "Scripts";
-    scriptsFrame.layoutMode = "HORIZONTAL";
-    scriptsFrame.itemSpacing = 24;
-    scriptsFrame.fills = [];
-    scriptsFrame.primaryAxisSizingMode = "AUTO";
-    scriptsFrame.counterAxisSizingMode = "AUTO";
-    storyboardFrame.appendChild(scriptsFrame);
+    const koText = figma.createText();
+    koText.fontName = koreanFont;
+    koText.fontSize = 16;
+    koText.textAutoResize = 'HEIGHT';
+    koText.resize(SCRIPT_COL_W, 100);
+    koText.characters = translatedScript || 'N/A';
+    koText.fills = [{ type: 'SOLID', color: { r: 0.867, g: 0.867, b: 0.867 } }];
+    koText.x = PAD * 2 + SCRIPT_COL_W;
+    koText.y = PAD + koLabel.height + 8;
+    section.appendChild(koText);
 
-    // Original script
-    const originalBlock = figma.createFrame();
-    originalBlock.layoutMode = "VERTICAL";
-    originalBlock.itemSpacing = 8;
-    originalBlock.paddingTop = 16;
-    originalBlock.paddingBottom = 16;
-    originalBlock.paddingLeft = 16;
-    originalBlock.paddingRight = 16;
-    originalBlock.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-    originalBlock.cornerRadius = 8;
-    originalBlock.primaryAxisSizingMode = "AUTO";
-    originalBlock.resize(540, 100);
+    const scriptsBottom = PAD + Math.max(
+      origLabel.height + 8 + origText.height,
+      koLabel.height + 8 + koText.height
+    );
 
-    const originalTitle = figma.createText();
-    originalTitle.characters = "📝 Original Script";
-    originalTitle.fontName = { family: "Inter", style: "Bold" };
-    originalTitle.fontSize = 14;
-    originalBlock.appendChild(originalTitle);
+    // FRAMES label
+    const framesLabel = figma.createText();
+    framesLabel.fontName = { family: 'Inter', style: 'Bold' };
+    framesLabel.fontSize = 14;
+    framesLabel.characters = 'FRAMES';
+    framesLabel.fills = [{ type: 'SOLID', color: { r: 0.53, g: 0.53, b: 0.53 } }];
+    framesLabel.x = PAD;
+    framesLabel.y = scriptsBottom + PAD;
+    section.appendChild(framesLabel);
 
-    const originalText = figma.createText();
-    originalText.characters = analysis?.original_script || 'N/A';
-    originalText.fontName = { family: "Inter", style: "Regular" };
-    originalText.fontSize = 13;
-    originalText.layoutAlign = "STRETCH";
-    originalBlock.appendChild(originalText);
-    scriptsFrame.appendChild(originalBlock);
+    const gridY = scriptsBottom + PAD + framesLabel.height + 12;
 
-    // Korean script
-    const koreanBlock = figma.createFrame();
-    koreanBlock.layoutMode = "VERTICAL";
-    koreanBlock.itemSpacing = 8;
-    koreanBlock.paddingTop = 16;
-    koreanBlock.paddingBottom = 16;
-    koreanBlock.paddingLeft = 16;
-    koreanBlock.paddingRight = 16;
-    koreanBlock.fills = [{ type: 'SOLID', color: { r: 0.94, g: 0.97, b: 1 } }];
-    koreanBlock.cornerRadius = 8;
-    koreanBlock.primaryAxisSizingMode = "AUTO";
-    koreanBlock.resize(540, 100);
+    const gridFrame = figma.createFrame();
+    gridFrame.name = '_grid';
+    gridFrame.fills = [];
+    gridFrame.resize(1, 1);
+    gridFrame.x = PAD;
+    gridFrame.y = gridY;
+    section.appendChild(gridFrame);
 
-    const koreanTitle = figma.createText();
-    koreanTitle.characters = "🇰🇷 Korean Script";
-    koreanTitle.fontName = { family: "Inter", style: "Bold" };
-    koreanTitle.fontSize = 14;
-    koreanBlock.appendChild(koreanTitle);
+    section.resize(SECTION_W, gridY + 1 + PAD);
+    section.x = figma.viewport.center.x - SECTION_W / 2;
+    section.y = figma.viewport.center.y + sectionCount * (section.height + 100);
+    sectionCount++;
 
-    const koreanText = figma.createText();
-    koreanText.characters = analysis?.translated_script || 'N/A';
-    koreanText.fontName = { family: "Inter", style: "Regular" };
-    koreanText.fontSize = 13;
-    koreanText.layoutAlign = "STRETCH";
-    koreanBlock.appendChild(koreanText);
-    scriptsFrame.appendChild(koreanBlock);
+    figma.currentPage.appendChild(section);
+    figma.viewport.scrollAndZoomIntoView([section]);
 
-    // 5. Strategic Note
-    const stratNode = figma.createText();
-    stratNode.characters = `🎯 Strategic Note\n${analysis?.strategic_note || 'N/A'}`;
-    stratNode.fontName = { family: "Inter", style: "Regular" };
-    stratNode.fontSize = 14;
-    stratNode.layoutAlign = "STRETCH";
-    storyboardFrame.appendChild(stratNode);
+    // Mark as processed so it won't be recreated next time
+    await saveProcessed(projectId);
 
-    // 6. Visual Cues
-    const cues = analysis?.visual_cues;
-    if (cues && Array.isArray(cues) && cues.length > 0) {
-      const cuesNode = figma.createText();
-      cuesNode.characters = `👁 Visual Cues\n${cues.map((c: string) => `• ${c}`).join('\n')}`;
-      cuesNode.fontName = { family: "Inter", style: "Regular" };
-      cuesNode.fontSize = 13;
-      cuesNode.layoutAlign = "STRETCH";
-      storyboardFrame.appendChild(cuesNode);
-    }
-
-    // Place on canvas
-    storyboardFrame.x = figma.viewport.center.x - 600;
-    storyboardFrame.y = figma.viewport.center.y - 300;
-    figma.currentPage.appendChild(storyboardFrame);
-    figma.viewport.scrollAndZoomIntoView([storyboardFrame]);
-
-    // Send Figma deep link back to UI for Discord notification
     const fileKey = figma.fileKey;
-    const nodeId = storyboardFrame.id;
     const figmaUrl = fileKey
-      ? `https://www.figma.com/file/${fileKey}?node-id=${encodeURIComponent(nodeId)}`
+      ? `https://www.figma.com/file/${fileKey}?node-id=${encodeURIComponent(section.id)}`
       : null;
 
-    figma.ui.postMessage({ type: 'storyboard-injected', projectId: project.id, figmaUrl });
+    figma.ui.postMessage({ type: 'section-created', projectId, sectionId: section.id, gridFrameId: gridFrame.id, figmaUrl });
+  }
 
-  } else if (msg.type === 'image-fetched') {
-    const targetNode = figma.getNodeById(msg.frameId) as FrameNode;
-    if (targetNode) {
-      const image = figma.createImage(new Uint8Array(msg.bytes));
-      targetNode.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash: image.hash }];
+  else if (msg.type === 'add-frame-to-section') {
+    const { frame, sectionId, gridFrameId } = msg;
+    figma.ui.postMessage({ type: 'fetch-image-for-grid', url: frame.storage_url, frame, sectionId, gridFrameId });
+  }
+
+  else if (msg.type === 'image-fetched-for-grid') {
+    const { bytes, frame, sectionId, gridFrameId } = msg;
+
+    const gridFrame = figma.getNodeById(gridFrameId) as FrameNode;
+    const section = figma.getNodeById(sectionId) as FrameNode;
+    if (!gridFrame || !section) {
+      figma.ui.postMessage({ type: 'frame-add-error', message: '섹션이 캔버스에서 삭제되었습니다.' });
+      return;
     }
+
+    const count = gridFrame.children.length;
+    const col = count % GRID_COLS;
+    const row = Math.floor(count / GRID_COLS);
+
+    const imgNode = figma.createFrame();
+    imgNode.name = `${frame.timestamp_seconds}s`;
+    imgNode.resize(IMG_W, IMG_H);
+    imgNode.cornerRadius = 8;
+    imgNode.x = col * (IMG_W + IMG_GAP);
+    imgNode.y = row * (IMG_H + IMG_GAP);
+
+    const image = figma.createImage(new Uint8Array(bytes));
+    imgNode.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash: image.hash }];
+    gridFrame.appendChild(imgNode);
+
+    const newCount = count + 1;
+    const totalCols = Math.min(newCount, GRID_COLS);
+    const totalRows = Math.ceil(newCount / GRID_COLS);
+    gridFrame.resize(
+      totalCols * IMG_W + (totalCols - 1) * IMG_GAP,
+      totalRows * IMG_H + (totalRows - 1) * IMG_GAP
+    );
+
+    section.resize(SECTION_W, gridFrame.y + gridFrame.height + PAD);
+
+    figma.ui.postMessage({ type: 'frame-added' });
   }
 };

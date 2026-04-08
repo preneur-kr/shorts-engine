@@ -1,110 +1,437 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shortform Engine UI</title>
-    <style>
-        body { font-family: 'Inter', sans-serif; padding: 20px; background-color: #f5f5f5; margin: 0; }
-        h2 { font-size: 16px; margin-bottom: 16px; }
-        .project-card {
-            background: white;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .status { font-size: 12px; font-weight: bold; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
-        .status.completed { background: #E8F5E9; color: #2E7D32; }
-        .status.pending { background: #FFF3E0; color: #EF6C00; }
-        button {
-            background: #0d99ff; color: white; border: none; padding: 8px 16px; border-radius: 6px;
-            cursor: pointer; font-weight: 500; width: 100%; margin-top: 8px;
-        }
-        button:hover { background: #0b80d6; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shortform Engine</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #1a1a1a; color: #fff; height: 100vh; display: flex; flex-direction: column; }
+
+    .header { padding: 12px; border-bottom: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 8px; }
+    select {
+      width: 100%; background: #2a2a2a; color: #fff; border: 1px solid #3a3a3a;
+      border-radius: 6px; padding: 8px 10px; font-size: 12px; cursor: pointer; outline: none;
+    }
+    .status-bar { display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0; }
+    .status-dot.active  { background: #22c55e; animation: pulse 2s infinite; }
+    .status-dot.loading { background: #f59e0b; animation: pulse 0.8s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .status-text { font-size: 10px; color: #555; flex: 1; }
+
+    /* 새로고침 버튼 */
+    .refresh-btn {
+      background: none; border: none; color: #555; cursor: pointer; padding: 2px;
+      display: flex; align-items: center; transition: color 0.15s;
+    }
+    .refresh-btn:hover { color: #fff; }
+    .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .carousel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; gap: 10px; }
+    .frame-wrapper { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .frame-img-container {
+      flex: 1; aspect-ratio: 9/16; max-height: 220px; background: #2a2a2a;
+      border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;
+    }
+    .frame-img-container img { width: 100%; height: 100%; object-fit: cover; }
+
+    .nav-btn {
+      background: #2a2a2a; border: none; color: #fff; width: 32px; height: 32px;
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    .nav-btn:hover { background: #3a3a3a; }
+    .nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+    .frame-controls { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+    .frame-counter { font-size: 11px; color: #888; }
+    .timestamp { font-size: 11px; color: #555; }
+    .add-btn {
+      background: #0d99ff; border: none; color: #fff; width: 32px; height: 32px;
+      border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .add-btn:hover { background: #0b80d6; }
+    .add-btn:active { transform: scale(0.92); }
+    .add-btn:disabled { background: #444; cursor: not-allowed; }
+    .add-btn.success { background: #22c55e; }
+
+    .scripts { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 160px; }
+    .script-block { background: #2a2a2a; border-radius: 8px; padding: 10px; }
+    .script-label { font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .script-text { font-size: 12px; color: #ddd; line-height: 1.5; white-space: pre-wrap; }
+
+    /* 진행중/실패 프로젝트 배지 */
+    option.opt-processing { color: #f59e0b; }
+    option.opt-failed     { color: #ef4444; }
+
+    .toast {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: #333; color: #fff; padding: 6px 14px; border-radius: 20px;
+      font-size: 11px; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+    .loading { text-align: center; color: #555; font-size: 12px; padding: 20px; }
+    .empty   { text-align: center; color: #555; font-size: 12px; padding: 20px; }
+  </style>
 </head>
 <body>
-    <h2>🚀 Ready to Inject</h2>
-    <div id="project-list">Loading...</div>
+  <div class="header">
+    <select id="project-select">
+      <option value="">프로젝트 선택...</option>
+    </select>
+    <div class="status-bar">
+      <span class="status-dot" id="status-dot"></span>
+      <span class="status-text" id="status-text">초기화 중...</span>
+      <button class="refresh-btn" id="refresh-btn" title="새로고침">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+          <path d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0 1 15-4.5M20 15a9 9 0 0 1-15 4.5"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 
-    <script>
-        // API Base URL (Change to Vercel production URL later)
-        const API_BASE = 'https://shortform-reverse-engine.vercel.app';
+  <div class="carousel" id="carousel">
+    <div class="empty">프로젝트를 선택하세요</div>
+  </div>
 
-        async function fetchProjects() {
-            try {
-                // Fetch from Next.js API
-                const res = await fetch(`${API_BASE}/api/projects`);
-                const data = await res.json();
-                renderProjects(data.projects);
-            } catch (err) {
-                document.getElementById('project-list').innerText = 'Failed to load projects. Is the local server running?';
-            }
+  <div class="scripts" id="scripts" style="display:none;"></div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API_BASE = 'https://shortform-reverse-engine.vercel.app';
+    const POLL_INTERVAL_MS = 60_000; // 60초마다 새 완료 프로젝트 확인
+
+    let frames = [];
+    let currentIndex = 0;
+    let analysis = null;
+    let currentProject = null;
+
+    const projectSections = new Map(); // projectId -> { sectionId, gridFrameId }
+    const knownProjectIds = new Set(); // 드롭다운에 이미 추가된 ID
+
+    let sectionQueue = [];
+    let isCreatingSection = false;
+    let pendingFrameAdd = null;
+
+    // ── Status ─────────────────────────────────────────────
+    function setStatus(state, text) {
+      document.getElementById('status-dot').className = 'status-dot' + (state ? ` ${state}` : '');
+      document.getElementById('status-text').textContent = text;
+    }
+
+    // ── Toast ──────────────────────────────────────────────
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // ── 드롭다운에 프로젝트 옵션 추가 ─────────────────────
+    function addProjectOption(p) {
+      if (knownProjectIds.has(p.id)) return;
+      knownProjectIds.add(p.id);
+
+      const select = document.getElementById('project-select');
+      const opt = document.createElement('option');
+      opt.value = p.id;
+
+      const label = p.source_url.replace(/https?:\/\/(www\.)?/, '').slice(0, 40);
+
+      if (p.status === 'COMPLETED') {
+        opt.textContent = label + '...';
+      } else if (p.status === 'FAILED') {
+        opt.textContent = `[실패] ${label}...`;
+        opt.className = 'opt-failed';
+        opt.disabled = true;
+      } else {
+        opt.textContent = `[분석중] ${label}...`;
+        opt.className = 'opt-processing';
+        opt.disabled = true;
+      }
+
+      select.appendChild(opt);
+    }
+
+    // ── 초기 로드 ──────────────────────────────────────────
+    async function loadProjects() {
+      setStatus('loading', '프로젝트 불러오는 중...');
+      try {
+        const res = await fetch(`${API_BASE}/api/projects`);
+        const data = await res.json();
+        const projects = data.projects || [];
+
+        projects.forEach(p => addProjectOption(p));
+
+        const completedIds = projects
+          .filter(p => p.status === 'COMPLETED')
+          .map(p => p.id);
+
+        if (completedIds.length === 0) {
+          setStatus('active', '대기 중');
+          return;
         }
 
-        function renderProjects(projects) {
-            const container = document.getElementById('project-list');
-            container.innerHTML = '';
+        parent.postMessage({ pluginMessage: { type: 'get-unprocessed', projectIds: completedIds } }, '*');
 
-            projects.forEach(p => {
-                const isCompleted = p.status === 'COMPLETED';
-                const card = document.createElement('div');
-                card.className = 'project-card';
-                card.innerHTML = `
-                    <div class="status ${isCompleted ? 'completed' : 'pending'}">${p.status}</div>
-                    <div style="font-size: 14px; margin-bottom: 8px; word-break: break-all;">${p.source_url.substring(0, 40)}...</div>
-                    <button ${!isCompleted ? 'disabled' : ''} onclick="injectStoryboard('${p.id}')">
-                        ${isCompleted ? 'Inject Storyboard' : 'Processing...'}
-                    </button>
-                `;
-                container.appendChild(card);
-            });
+      } catch (e) {
+        setStatus('', '서버 연결 실패');
+        document.getElementById('carousel').innerHTML = '<div class="empty">서버 연결 실패</div>';
+      }
+    }
+
+    // ── 폴링: 새로 완료된 프로젝트 감지 ──────────────────
+    async function pollNewCompleted() {
+      try {
+        const res = await fetch(`${API_BASE}/api/projects`);
+        const data = await res.json();
+        const projects = data.projects || [];
+
+        // 드롭다운 상태 갱신 (분석중→완료, 분석중→실패)
+        projects.forEach(p => {
+          const select = document.getElementById('project-select');
+          const existing = select.querySelector(`option[value="${p.id}"]`);
+          if (existing && p.status === 'COMPLETED' && existing.disabled) {
+            existing.textContent = p.source_url.replace(/https?:\/\/(www\.)?/, '').slice(0, 40) + '...';
+            existing.className = '';
+            existing.disabled = false;
+          } else if (existing && p.status === 'FAILED' && !existing.className.includes('opt-failed')) {
+            existing.textContent = `[실패] ${p.source_url.replace(/https?:\/\/(www\.)?/, '').slice(0, 40)}...`;
+            existing.className = 'opt-failed';
+            existing.disabled = true;
+          }
+          // 새 프로젝트면 추가
+          addProjectOption(p);
+        });
+
+        // 새로 완료된 것만 섹션 생성 대상
+        const newCompleted = projects
+          .filter(p => p.status === 'COMPLETED' && !projectSections.has(p.id));
+
+        if (newCompleted.length > 0) {
+          parent.postMessage({
+            pluginMessage: { type: 'get-unprocessed', projectIds: newCompleted.map(p => p.id) }
+          }, '*');
+        }
+      } catch (e) { /* silent fail */ }
+    }
+
+    // ── 섹션 큐 ───────────────────────────────────────────
+    async function processSectionQueue() {
+      if (isCreatingSection) return;
+      if (sectionQueue.length === 0) {
+        setStatus('active', '대기 중');
+        return;
+      }
+      isCreatingSection = true;
+      const projectId = sectionQueue.shift();
+      const remaining = sectionQueue.length;
+      setStatus('loading', `섹션 생성 중${remaining > 0 ? ` (${remaining}개 남음)` : ''}...`);
+      await autoCreateSection(projectId);
+    }
+
+    async function autoCreateSection(projectId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/analysis`);
+        const data = await res.json();
+        parent.postMessage({ pluginMessage: {
+          type: 'create-project-section',
+          projectId,
+          sourceUrl: data.project?.source_url || '',
+          originalScript: data.analysis?.original_script || '',
+          translatedScript: data.analysis?.translated_script || '',
+        }}, '*');
+      } catch (e) {
+        console.error('Section creation failed for', projectId, e);
+        isCreatingSection = false;
+        processSectionQueue();
+      }
+    }
+
+    // ── 프로젝트 상세 로드 ────────────────────────────────
+    async function loadProject(projectId) {
+      document.getElementById('carousel').innerHTML = '<div class="loading">로딩 중...</div>';
+      document.getElementById('scripts').style.display = 'none';
+      try {
+        const res = await fetch(`${API_BASE}/api/projects/${projectId}/analysis`);
+        const data = await res.json();
+        frames = data.frames || [];
+        analysis = data.analysis || null;
+        currentProject = data.project || null;
+        currentIndex = 0;
+        renderCarousel();
+        renderScripts();
+      } catch (e) {
+        document.getElementById('carousel').innerHTML = '<div class="empty">로드 실패</div>';
+      }
+    }
+
+    // ── 캐러셀 ────────────────────────────────────────────
+    function renderCarousel() {
+      const carousel = document.getElementById('carousel');
+      if (!frames.length) {
+        carousel.innerHTML = '<div class="empty">프레임 없음</div>';
+        return;
+      }
+      const frame = frames[currentIndex];
+      carousel.innerHTML = `
+        <div class="frame-wrapper">
+          <button class="nav-btn" id="prev-btn" ${currentIndex === 0 ? 'disabled' : ''}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="frame-img-container">
+            <img src="${frame.storage_url}" alt="frame" />
+          </div>
+          <button class="nav-btn" id="next-btn" ${currentIndex === frames.length - 1 ? 'disabled' : ''}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="frame-controls">
+          <span class="timestamp">${frame.timestamp_seconds}s</span>
+          <span class="frame-counter">${currentIndex + 1} / ${frames.length}</span>
+          <button class="add-btn" id="add-btn" title="섹션에 추가">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      `;
+      document.getElementById('prev-btn').addEventListener('click', () => { currentIndex--; renderCarousel(); });
+      document.getElementById('next-btn').addEventListener('click', () => { currentIndex++; renderCarousel(); });
+      document.getElementById('add-btn').addEventListener('click', onAddFrame);
+    }
+
+    function onAddFrame() {
+      if (!currentProject) return;
+      const frame = frames[currentIndex];
+      const projectId = currentProject.id;
+
+      if (projectSections.has(projectId)) {
+        const { sectionId, gridFrameId } = projectSections.get(projectId);
+        parent.postMessage({ pluginMessage: { type: 'add-frame-to-section', frame, sectionId, gridFrameId } }, '*');
+        setAddBtnLoading(true);
+      } else {
+        pendingFrameAdd = { projectId, frame };
+        setAddBtnLoading(true);
+        autoCreateSection(projectId);
+      }
+    }
+
+    function setAddBtnLoading(loading) {
+      const btn = document.getElementById('add-btn');
+      if (btn) btn.disabled = loading;
+    }
+
+    // ── 대본 ──────────────────────────────────────────────
+    function renderScripts() {
+      const scriptsEl = document.getElementById('scripts');
+      if (!analysis) { scriptsEl.style.display = 'none'; return; }
+      scriptsEl.style.display = 'flex';
+      scriptsEl.innerHTML = `
+        <div class="script-block">
+          <div class="script-label">Original</div>
+          <div class="script-text">${analysis.original_script || 'N/A'}</div>
+        </div>
+        <div class="script-block">
+          <div class="script-label">한국어</div>
+          <div class="script-text">${analysis.translated_script || 'N/A'}</div>
+        </div>
+      `;
+    }
+
+    // ── 이벤트 ────────────────────────────────────────────
+    document.getElementById('project-select').addEventListener('change', (e) => {
+      if (e.target.value) loadProject(e.target.value);
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('refresh-btn');
+      btn.classList.add('spinning');
+      await pollNewCompleted();
+      btn.classList.remove('spinning');
+      showToast('새로고침 완료');
+    });
+
+    // ── code.ts 메시지 ────────────────────────────────────
+    window.onmessage = async (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'unprocessed-result') {
+        const { unprocessedIds } = msg;
+        if (unprocessedIds.length === 0) {
+          setStatus('active', '대기 중');
+          return;
+        }
+        showToast(`${unprocessedIds.length}개 새 프로젝트 발견`);
+        sectionQueue.push(...unprocessedIds.filter(id => !sectionQueue.includes(id)));
+        processSectionQueue();
+      }
+
+      if (msg.type === 'fetch-image-for-grid') {
+        try {
+          const res = await fetch(msg.url);
+          const buffer = await res.arrayBuffer();
+          const bytes = Array.from(new Uint8Array(buffer));
+          parent.postMessage({ pluginMessage: {
+            type: 'image-fetched-for-grid',
+            bytes, frame: msg.frame, sectionId: msg.sectionId, gridFrameId: msg.gridFrameId,
+          }}, '*');
+        } catch (e) {
+          console.error('Image fetch failed', e);
+          setAddBtnLoading(false);
+        }
+      }
+
+      if (msg.type === 'section-created') {
+        projectSections.set(msg.projectId, { sectionId: msg.sectionId, gridFrameId: msg.gridFrameId });
+        showToast('섹션 생성 완료');
+
+        if (msg.figmaUrl) {
+          fetch(`${API_BASE}/api/projects/${msg.projectId}/notify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ figmaUrl: msg.figmaUrl }),
+          }).catch(() => {});
         }
 
-        async function injectStoryboard(projectId) {
-            try {
-                // Fetch detailed analysis & frames
-                const res = await fetch(`${API_BASE}/api/projects/${projectId}/analysis`);
-                const payload = await res.json();
-                
-                // Send data to Figma Canvas logic
-                parent.postMessage({ pluginMessage: { type: 'inject-storyboard', payload } }, '*');
-            } catch (err) {
-                alert('Failed to fetch analysis data.');
-            }
+        if (pendingFrameAdd && pendingFrameAdd.projectId === msg.projectId) {
+          const { frame } = pendingFrameAdd;
+          pendingFrameAdd = null;
+          parent.postMessage({ pluginMessage: {
+            type: 'add-frame-to-section', frame,
+            sectionId: msg.sectionId, gridFrameId: msg.gridFrameId,
+          }}, '*');
+        } else {
+          setAddBtnLoading(false);
+          isCreatingSection = false;
+          processSectionQueue();
         }
+      }
 
-        // Listen for messages from code.ts
-        window.onmessage = async (event) => {
-            const msg = event.data.pluginMessage;
-            if (!msg) return;
+      if (msg.type === 'frame-added') {
+        setAddBtnLoading(false);
+        const btn = document.getElementById('add-btn');
+        if (btn) {
+          btn.classList.add('success');
+          setTimeout(() => btn.classList.remove('success'), 800);
+        }
+        showToast('프레임 추가됨');
+      }
 
-            if (msg.type === 'fetch-image') {
-                try {
-                    const res = await fetch(msg.url);
-                    const buffer = await res.arrayBuffer();
-                    parent.postMessage({ pluginMessage: { type: 'image-fetched', frameId: msg.frameId, bytes: Array.from(new Uint8Array(buffer)) } }, '*');
-                } catch (e) {
-                    console.error("Image fetch failed", e);
-                }
-            }
+      if (msg.type === 'frame-add-error') {
+        setAddBtnLoading(false);
+        showToast(msg.message || '오류가 발생했습니다.');
+      }
+    };
 
-            if (msg.type === 'storyboard-injected') {
-                try {
-                    await fetch(`${API_BASE}/api/projects/${msg.projectId}/notify`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ figmaUrl: msg.figmaUrl }),
-                    });
-                } catch (e) {
-                    console.error("Discord notify failed", e);
-                }
-            }
-        };
-
-        fetchProjects();
-    </script>
+    // ── 시작 ──────────────────────────────────────────────
+    loadProjects();
+    setInterval(pollNewCompleted, POLL_INTERVAL_MS);
+  </script>
 </body>
 </html>

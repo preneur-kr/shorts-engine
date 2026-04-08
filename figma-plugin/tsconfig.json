@@ -1,8 +1,11 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "lib": ["es6", "dom"],
-    "strict": true,
-    "typeRoots": ["./node_modules/@types", "./node_modules/@figma"]
-  }
+    "lib": ["es2016", "dom"],
+    "strict": false,
+    "typeRoots": ["./node_modules/@types"],
+    "paths": {}
+  },
+  "include": ["src"],
+  "files": ["node_modules/@figma/plugin-typings/index.d.ts"]
 }

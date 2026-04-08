@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
     storage_folder TEXT, -- Path in Supabase Storage
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    error_message TEXT -- Store failure reason
+    error_message TEXT, -- Store failure reason
+    gemini_file_uri TEXT -- Gemini File API URI for video analysis
 );
 
 -- 3. Frames Table
@@ -33,7 +34,8 @@ CREATE TABLE IF NOT EXISTS public.analysis_insights (
     original_script TEXT,
     translated_script TEXT,
     hook_analysis TEXT,
-    visual_cues JSONB, -- Strategic cues
+    visual_cues JSONB, -- Strategic cues (string array)
+    strategic_note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
