@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.analysis_insights (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
     frame_id UUID REFERENCES public.frames(id),
+    hook_sentence TEXT,       -- 시청자를 처음 멈추게 만든 첫 문장 (원문)
     original_script TEXT,
     translated_script TEXT,
     hook_analysis TEXT,
@@ -38,6 +39,10 @@ CREATE TABLE IF NOT EXISTS public.analysis_insights (
     strategic_note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Migration: add hook_sentence column if upgrading from v1.0
+-- Run this once against existing Supabase DB:
+-- ALTER TABLE public.analysis_insights ADD COLUMN IF NOT EXISTS hook_sentence TEXT;
 
 -- 5. Error Logs for Observability
 CREATE TABLE IF NOT EXISTS public.error_logs (

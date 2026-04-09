@@ -240,12 +240,32 @@
       try {
         const res = await fetch(`${API_BASE}/api/projects/${projectId}/analysis`);
         const data = await res.json();
+        const frames = data.frames || [];
+
+        // ── 병렬로 모든 프레임 이미지 fetch (썸네일 크기로 축소) ──────────
+        const imageResults = await Promise.allSettled(
+          frames.map(async (frame) => {
+            // Supabase Storage transform: 원본 720x1280 → 360x640 (~75% 용량 감소)
+            const url = frame.storage_url + '?width=360&height=640&resize=cover';
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const buffer = await r.arrayBuffer();
+            return { bytes: Array.from(new Uint8Array(buffer)), frame };
+          })
+        );
+
+        const images = imageResults
+          .filter(r => r.status === 'fulfilled')
+          .map(r => r.value);
+
         parent.postMessage({ pluginMessage: {
           type: 'create-project-section',
           projectId,
           sourceUrl: data.project?.source_url || '',
+          hookSentence: data.analysis?.hook_sentence || '',
           originalScript: data.analysis?.original_script || '',
           translatedScript: data.analysis?.translated_script || '',
+          images, // 미리 fetch된 이미지 데이터
         }}, '*');
       } catch (e) {
         console.error('Section creation failed for', projectId, e);
@@ -388,8 +408,11 @@
       }
 
       if (msg.type === 'section-created') {
-        projectSections.set(msg.projectId, { sectionId: msg.sectionId, gridFrameId: msg.gridFrameId });
-        showToast('섹션 생성 완료');
+        projectSections.set(msg.projectId, {
+          sectionId: msg.sectionId,
+          gridFrameId: msg.gridFrameId,
+          images: msg.images || [],
+        });
 
         if (msg.figmaUrl) {
           fetch(`${API_BASE}/api/projects/${msg.projectId}/notify`, {
@@ -399,18 +422,27 @@
           }).catch(() => {});
         }
 
-        if (pendingFrameAdd && pendingFrameAdd.projectId === msg.projectId) {
-          const { frame } = pendingFrameAdd;
-          pendingFrameAdd = null;
+        // 미리 fetch된 이미지가 있으면 bulk로 한 번에 전송
+        if (msg.images && msg.images.length > 0) {
           parent.postMessage({ pluginMessage: {
-            type: 'add-frame-to-section', frame,
-            sectionId: msg.sectionId, gridFrameId: msg.gridFrameId,
+            type: 'bulk-images-fetched',
+            images: msg.images,
+            sectionId: msg.sectionId,
+            gridFrameId: msg.gridFrameId,
           }}, '*');
         } else {
+          showToast('섹션 생성 완료');
           setAddBtnLoading(false);
           isCreatingSection = false;
           processSectionQueue();
         }
+      }
+
+      if (msg.type === 'bulk-frames-added') {
+        showToast('섹션 생성 완료');
+        setAddBtnLoading(false);
+        isCreatingSection = false;
+        processSectionQueue();
       }
 
       if (msg.type === 'frame-added') {

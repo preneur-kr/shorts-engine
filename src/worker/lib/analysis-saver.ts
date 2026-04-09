@@ -8,6 +8,7 @@ export async function saveAnalysis(
 ): Promise<void> {
   const { error } = await supabase.from('analysis_insights').insert({
     project_id: projectId,
+    hook_sentence: analysis.hook_sentence,
     original_script: analysis.original_script,
     translated_script: analysis.translated_script,
     hook_analysis: analysis.hook_analysis,
