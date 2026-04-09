@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { SHORTFORM_ANALYSIS_PROMPT } from '../../services/ai-prompts';
 
-const GEMINI_MODEL = 'gemini-2.5-pro-preview-03-25';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_TIMEOUT_MS = 5 * 60 * 1000; // 5분 (영상 분석은 오래 걸림)
 
 export interface AnalysisResult {
